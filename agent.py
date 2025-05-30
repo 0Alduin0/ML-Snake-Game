@@ -66,6 +66,13 @@ class Agent:
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
+    def save(self, file_name='./model/model.pth'):
+        torch.save(self.model.state_dict(), file_name)
+
+    def load(self, file_name='./model/model.pth'):
+        self.model.load_state_dict(torch.load(file_name))
+        self.model.eval()  # Değerlendirme moduna al
+
     def train_long_memory(self):
         if len(self.memory) > BATCH_SIZE:
             mini_sample = random.sample(self.memory, BATCH_SIZE)

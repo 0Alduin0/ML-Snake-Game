@@ -19,6 +19,11 @@ def train():
     total_score = 0
     record = 0
     agent = Agent()
+    try:
+        agent.load('./model/model.pth')
+        print("Model başarıyla yüklendi, eğitim kaldığı yerden devam edecek.")
+    except FileNotFoundError:
+        print("Kayıtlı model bulunamadı, yeni eğitim başlayacak.")
     game = SnakeGameAI()
 
     while True:
@@ -57,7 +62,7 @@ def train():
             mean_scores.append(total_score / agent.n_games)
 
             # Grafik çiz (isteğe bağlı)
-            if agent.n_games % 10 == 0:
+            if agent.n_games % 50 == 0:
                 plot(scores, mean_scores)
 
 if __name__ == '__main__':
