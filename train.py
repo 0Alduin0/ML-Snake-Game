@@ -2,16 +2,21 @@ import torch
 from agent import Agent
 from game import SnakeGameAI
 import matplotlib.pyplot as plt
+import os
 
+
+# Skor grafiğini çizmek için
 def plot(scores, mean_scores):
-    plt.figure(figsize=(10,5))
+    plt.figure(figsize=(10, 5))
     plt.title('Yılan Oyunu - Skor Grafiği')
     plt.xlabel('Oyun Sayısı')
     plt.ylabel('Skor')
     plt.plot(scores, label='Skor')
     plt.plot(mean_scores, label='Ortalama Skor')
     plt.legend()
+    plt.grid()
     plt.show()
+
 
 def train():
     scores = []
@@ -19,51 +24,64 @@ def train():
     total_score = 0
     record = 0
     agent = Agent()
-    try:
-        agent.load('./model/model.pth')
+
+    # MODEL DOSYASI YOLU - hem load hem save aynı olsun
+    model_path = './model/model.pth'
+
+    # Model klasörü yoksa oluştur
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+
+    # Daha önce kayıtlı model varsa yükle
+    if os.path.exists(model_path):
+        agent.load(model_path)
         print("Model başarıyla yüklendi, eğitim kaldığı yerden devam edecek.")
-    except FileNotFoundError:
+    else:
         print("Kayıtlı model bulunamadı, yeni eğitim başlayacak.")
+
     game = SnakeGameAI()
 
     while True:
-        # Durum bilgisi al
+        # 1. Durum bilgisi al
         state_old = agent.get_state(game)
 
-        # Hareket seç
+        # 2. Hareket seç (model ya da rastgele)
         final_move = agent.get_action(state_old)
 
-        # Adımı uygula ve sonuç al
+        # 3. Adımı uygula (oyun ortamında)
         reward, done, score = game.play_step(final_move)
 
-        # Yeni durum bilgisi
+        # 4. Yeni durumu al
         state_new = agent.get_state(game)
 
-        # Kısa dönem öğren
+        # 5. Kısa dönem öğrenme
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
 
-        # Hafızaya kaydet
+        # 6. Hafızaya kaydet (uzun dönem için)
         agent.remember(state_old, final_move, reward, state_new, done)
 
         if done:
-            # Oyun bittiğinde
+            # Oyun bittiğinde reset ve uzun dönem öğrenme
             game.reset()
             agent.n_games += 1
             agent.train_long_memory()
 
+            # Yeni skor, rekoru geçerse modeli kaydet
             if score > record:
                 record = score
-                agent.model.save()
+                agent.save(model_path)
+                print("Yeni rekor! Model kaydedildi.")
 
             print('Oyun:', agent.n_games, 'Skor:', score, 'Rekor:', record)
 
+            # Skorları kaydet ve ortalamayı hesapla
             scores.append(score)
             total_score += score
             mean_scores.append(total_score / agent.n_games)
 
-            # Grafik çiz (isteğe bağlı)
+            # Her 50 oyunda bir grafik çiz
             if agent.n_games % 50 == 0:
                 plot(scores, mean_scores)
+
 
 if __name__ == '__main__':
     train()

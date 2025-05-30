@@ -42,12 +42,11 @@ class QTrainer:
             next_state = torch.unsqueeze(next_state, 0)
             action = torch.unsqueeze(action, 0)
             reward = torch.unsqueeze(reward, 0)
-            done = (done, )
+            if isinstance(done, bool):
+                done = (done, )
 
-        # 1. Tahmin
         pred = self.model(state)
 
-        # 2. Hedef
         target = pred.clone()
         for idx in range(len(done)):
             Q_new = reward[idx]

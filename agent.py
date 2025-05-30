@@ -6,17 +6,18 @@ from game import SnakeGameAI, Direction, Point
 from model import Linear_QNet, QTrainer
 import matplotlib.pyplot as plt
 
+# Sabitler
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
-LR = 0.001
+LR = 0.001  # Öğrenme oranı
 
 class Agent:
     def __init__(self):
-        self.n_games = 0
-        self.epsilon = 0  # keşif oranı
-        self.gamma = 0.9  # gelecekteki ödül
-        self.memory = deque(maxlen=MAX_MEMORY)
-        self.model = Linear_QNet(11, 256, 3)
+        self.n_games = 0                      # Kaç oyun oynandığı
+        self.epsilon = 0                      # Keşfetme oranı
+        self.gamma = 0.9                      # Gelecek ödül katsayısı (0 < γ < 1)
+        self.memory = deque(maxlen=MAX_MEMORY)  # Deneyim hafızası
+        self.model = Linear_QNet(11, 256, 3)  # Giriş 11, gizli 256, çıkış 3 (sol, düz, sağ)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, game):
@@ -31,8 +32,9 @@ class Agent:
         dir_u = game.direction == Direction.UP
         dir_d = game.direction == Direction.DOWN
 
+        # 11 boyutlu durum vektörü
         state = [
-            # Tehlike
+            # 1. Tehlike düz, sağ, sol (yöne göre)
             (dir_r and game._is_collision(point_r)) or
             (dir_l and game._is_collision(point_l)) or
             (dir_u and game._is_collision(point_u)) or
@@ -48,32 +50,27 @@ class Agent:
             (dir_r and game._is_collision(point_u)) or
             (dir_l and game._is_collision(point_d)),
 
-            # Hareket yönü
+            # 2. Yön bilgisi
             dir_l,
             dir_r,
             dir_u,
             dir_d,
 
-            # Yem konumu
-            game.food.x < game.head.x,  # sol
-            game.food.x > game.head.x,  # sağ
-            game.food.y < game.head.y,  # yukarı
-            game.food.y > game.head.y  # aşağı
+            # 3. Yem konumu bilgisi
+            game.food.x < head.x,  # sol
+            game.food.x > head.x,  # sağ
+            game.food.y < head.y,  # yukarı
+            game.food.y > head.y   # aşağı
         ]
 
         return np.array(state, dtype=int)
 
     def remember(self, state, action, reward, next_state, done):
+        """ Deneyimi hafızaya kaydet. """
         self.memory.append((state, action, reward, next_state, done))
 
-    def save(self, file_name='./model/model.pth'):
-        torch.save(self.model.state_dict(), file_name)
-
-    def load(self, file_name='./model/model.pth'):
-        self.model.load_state_dict(torch.load(file_name))
-        self.model.eval()  # Değerlendirme moduna al
-
     def train_long_memory(self):
+        """ Rastgele örneklerle uzun dönemli öğrenme. """
         if len(self.memory) > BATCH_SIZE:
             mini_sample = random.sample(self.memory, BATCH_SIZE)
         else:
@@ -83,18 +80,32 @@ class Agent:
         self.trainer.train_step(states, actions, rewards, next_states, dones)
 
     def train_short_memory(self, state, action, reward, next_state, done):
+        """ Tek adımlık hızlı öğrenme. """
         self.trainer.train_step(state, action, reward, next_state, done)
 
     def get_action(self, state):
-        self.epsilon = 80 - self.n_games
+        """ Karar verme: keşfetme mi tahmin mi? """
+        self.epsilon = max(0, 80 - self.n_games)  # Oyun ilerledikçe keşif azalır
         final_move = [0, 0, 0]
+
         if random.randint(0, 200) < self.epsilon:
+            # Keşfetme: rastgele hareket
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
+            # Modelin tahminine göre hareket
             state0 = torch.tensor(state, dtype=torch.float)
             prediction = self.model(state0)
             move = torch.argmax(prediction).item()
             final_move[move] = 1
 
         return final_move
+
+    def save(self, file_name='./model/model.pth'):
+        """ Modeli kaydet. """
+        torch.save(self.model.state_dict(), file_name)
+
+    def load(self, file_name='./model/model.pth'):
+        """ Modeli yükle. """
+        self.model.load_state_dict(torch.load(file_name))
+        self.model.eval()
