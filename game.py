@@ -23,7 +23,7 @@ GREEN = (0, 255, 0)
 BLACK = (0, 0, 0)
 
 BLOCK_SIZE = 20
-SPEED = 60
+SPEED = 10000
 
 class SnakeGameAI:
     def __init__(self, w=640, h=480):
@@ -65,19 +65,36 @@ class SnakeGameAI:
 
         action = np.array(action)  # Güvenlik için
 
+        old_distance = abs(self.head.x - self.food.x) + abs(self.head.y - self.food.y)
+
         self._move(action)
         self.snake.insert(0, self.head)
 
-        if self._is_collision() or self.frame_iteration > 100 * len(self.snake):
-            return -10, True, self.score
+        reward = 0
 
+        # Çarpışma kontrolü veya çok uzun süre aynı yerde dönme
+        if self._is_collision() or self.frame_iteration > 100 * len(self.snake):
+            reward = -10
+            return reward, True, self.score
+
+        # Yem yedi mi?
         if self.head == self.food:
             self.score += 1
             reward = 10
             self._place_food()
+            self.frame_iteration = 0  # yem yerse sayaç sıfırlansın
         else:
             self.snake.pop()
-            reward = 0
+
+            # Her adım için küçük ceza (döngü engeli)
+            reward = -0.01
+
+            # Uzaklaşma/yaklaşma cezası/ödülü
+            new_distance = abs(self.head.x - self.food.x) + abs(self.head.y - self.food.y)
+            if new_distance < old_distance:
+                reward += 0.1
+            elif new_distance > old_distance:
+                reward -= 0.1
 
         self._update_ui()
         self.clock.tick(SPEED)
